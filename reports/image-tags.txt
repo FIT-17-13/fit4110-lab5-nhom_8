@@ -1,0 +1,6 @@
+﻿
+fit4110/iot-ingestion:v0.1.0-nhom_8
+fit4110/ai-service:v0.1.0-nhom_8
+fit4110/iot-ingestion:lab04
+
+

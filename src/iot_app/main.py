@@ -1,25 +1,31 @@
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, Generator, List, Optional
 
+import psycopg2
+import requests
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-# Đọc biến môi trường với giá trị mặc định
 SERVICE_NAME = os.getenv("SERVICE_NAME", "iot-ingestion")
-SERVICE_VERSION = os.getenv("SERVICE_VERSION", "0.5.0")
+SERVICE_VERSION = os.getenv("SERVICE_VERSION", "v0.1.0-nhom_8")
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "local-dev-token")
-
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://lab05:lab05pass@localhost:5432/iotdb",
+)
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://localhost:9000")
 
 app = FastAPI(
     title="FIT4110 Lab 05 - IoT Ingestion Service",
     version=SERVICE_VERSION,
     description=(
-        "IoT Ingestion API chạy trong ngữ cảnh Docker Compose cho Lab 05. "
-        "Luồng logic được kế thừa từ Lab 04 và tiếp tục được dùng để kiểm thử end‑to‑end."
+        "IoT Ingestion API chạy trong ngữ cảnh Docker Compose cho Lab 05. "
+        "Luồng logic được kế thừa từ Lab 04 và tiếp tục được dùng để kiểm thử end-to-end."
     ),
 )
 
@@ -50,6 +56,8 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    db: str
+    ai: str
 
 
 class SensorReadingCreate(BaseModel):
@@ -59,7 +67,7 @@ class SensorReadingCreate(BaseModel):
         ...,
         ge=-40,
         le=80,
-        description="Boundary range used in Lab 03 và Lab 04: -40 đến 80.",
+        description="Boundary range used in Lab 03 và Lab 04: -40 đến 80.",
         examples=[31.5],
     )
     unit: Optional[SensorUnit] = Field(default=None, examples=["celsius"])
@@ -84,7 +92,51 @@ class SensorReadingCreated(BaseModel):
     created_at: str
 
 
-READINGS: List[Dict] = []
+@contextmanager
+def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
+    conn = psycopg2.connect(DATABASE_URL)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def init_db() -> None:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sensor_readings (
+                    reading_id VARCHAR(32) PRIMARY KEY,
+                    device_id VARCHAR(64) NOT NULL,
+                    metric VARCHAR(32) NOT NULL,
+                    value DOUBLE PRECISION NOT NULL,
+                    unit VARCHAR(32),
+                    timestamp TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+        conn.commit()
+
+
+def check_db_ready() -> bool:
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+        return True
+    except psycopg2.Error:
+        return False
+
+
+def check_ai_ready() -> bool:
+    try:
+        response = requests.get(f"{AI_SERVICE_URL.rstrip('/')}/health", timeout=3)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
 
 
 def build_problem(
@@ -106,6 +158,21 @@ def build_problem(
     return problem
 
 
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+
+
+def http_status_title(status_code: int) -> str:
+    titles = {
+        401: "Unauthorized",
+        404: "Not Found",
+        422: "Unprocessable Entity",
+        429: "Too Many Requests",
+    }
+    return titles.get(status_code, "HTTP Error")
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     if isinstance(exc.detail, dict):
@@ -113,13 +180,13 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     else:
         problem = build_problem(
             status_code=exc.status_code,
-            title=status.HTTP_STATUS_CODES.get(exc.status_code, "HTTP Error"),
+            title=http_status_title(exc.status_code),
             detail=str(exc.detail),
             instance=str(request.url.path),
         )
 
     problem.setdefault("status", exc.status_code)
-    problem.setdefault("title", status.HTTP_STATUS_CODES.get(exc.status_code, "HTTP Error"))
+    problem.setdefault("title", http_status_title(exc.status_code))
     problem.setdefault("type", "about:blank")
     problem.setdefault("detail", "Request failed")
     problem.setdefault("instance", str(request.url.path))
@@ -185,15 +252,39 @@ def now_iso() -> str:
 
 def next_reading_id() -> str:
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    return f"R-{today}-{len(READINGS) + 1:04d}"
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM sensor_readings WHERE reading_id LIKE %s",
+                (f"R-{today}-%",),
+            )
+            count = cur.fetchone()[0]
+    return f"R-{today}-{count + 1:04d}"
+
+
+def row_to_dict(row: tuple) -> Dict:
+    return {
+        "reading_id": row[0],
+        "device_id": row[1],
+        "metric": row[2],
+        "value": row[3],
+        "unit": row[4],
+        "timestamp": row[5],
+        "created_at": row[6],
+    }
 
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    db_ok = check_db_ready()
+    ai_ok = check_ai_ready()
+
     return HealthResponse(
         status="ok",
         service=SERVICE_NAME,
         version=SERVICE_VERSION,
+        db="ok" if db_ok else "unavailable",
+        ai="ok" if ai_ok else "unavailable",
     )
 
 
@@ -209,23 +300,38 @@ def health() -> HealthResponse:
     },
 )
 def create_reading(payload: SensorReadingCreate, response: Response) -> SensorReadingCreated:
-    # Ví dụ logic cảnh báo: nếu nhiệt độ >= 70 thì thêm header cảnh báo
     if payload.metric == SensorMetric.temperature and payload.value >= 70:
         response.headers["X-Warning"] = "high-temperature"
 
     reading_id = next_reading_id()
     created_at = now_iso()
+    unit_value = payload.unit.value if payload.unit else None
 
-    item = {
-        "reading_id": reading_id,
-        "device_id": payload.device_id,
-        "metric": payload.metric.value,
-        "value": payload.value,
-        "unit": payload.unit.value if payload.unit else None,
-        "timestamp": payload.timestamp,
-        "created_at": created_at,
-    }
-    READINGS.append(item)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO sensor_readings
+                    (reading_id, device_id, metric, value, unit, timestamp, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    reading_id,
+                    payload.device_id,
+                    payload.metric.value,
+                    payload.value,
+                    unit_value,
+                    payload.timestamp,
+                    created_at,
+                ),
+            )
+        conn.commit()
+
+    if payload.metric == SensorMetric.motion:
+        try:
+            requests.post(f"{AI_SERVICE_URL.rstrip('/')}/predict", timeout=3)
+        except requests.RequestException:
+            pass
 
     return SensorReadingCreated(
         reading_id=reading_id,
@@ -241,19 +347,44 @@ def latest_readings(
     device_id: Optional[str] = Query(default=None),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> Dict[str, List[Dict]]:
-    items = READINGS
+    query = """
+        SELECT reading_id, device_id, metric, value, unit, timestamp, created_at
+        FROM sensor_readings
+    """
+    params: List = []
 
     if device_id:
-        items = [item for item in items if item["device_id"] == device_id]
+        query += " WHERE device_id = %s"
+        params.append(device_id)
 
-    return {"items": items[-limit:]}
+    query += " ORDER BY created_at DESC LIMIT %s"
+    params.append(limit)
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+
+    items = [row_to_dict(row) for row in reversed(rows)]
+    return {"items": items}
 
 
 @app.get("/readings/{reading_id}", dependencies=[Depends(verify_bearer_token)])
 def get_reading(reading_id: str) -> Dict:
-    for item in READINGS:
-        if item["reading_id"] == reading_id:
-            return item
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT reading_id, device_id, metric, value, unit, timestamp, created_at
+                FROM sensor_readings
+                WHERE reading_id = %s
+                """,
+                (reading_id,),
+            )
+            row = cur.fetchone()
+
+    if row:
+        return row_to_dict(row)
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,

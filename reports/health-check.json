@@ -1,0 +1,14 @@
+﻿{
+    "ai":  {
+               "status":  "ok",
+               "service":  "ai-service",
+               "version":  "v0.1.0-nhom_8"
+           },
+    "api":  {
+                "status":  "ok",
+                "service":  "iot-ingestion",
+                "version":  "v0.1.0-nhom_8",
+                "db":  "ok",
+                "ai":  "ok"
+            }
+}

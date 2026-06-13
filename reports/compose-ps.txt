@@ -1,0 +1,5 @@
+﻿NAME                IMAGE                                 COMMAND                  SERVICE      CREATED          STATUS                    PORTS
+fit4110-ai-lab05    fit4110/ai-service:v0.1.0-nhom_8      "python main.py"         ai-service   38 seconds ago   Up 34 seconds (healthy)   0.0.0.0:9000->9000/tcp, [::]:9000->9000/tcp
+fit4110-api-lab05   fit4110/iot-ingestion:v0.1.0-nhom_8   "sh -c 'uvicorn iot_ΓÇª"   api          37 seconds ago   Up 28 seconds (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+fit4110-db-lab05    postgres:15-alpine                    "docker-entrypoint.sΓÇª"   db           14 minutes ago   Up 14 minutes (healthy)   5432/tcp
+/var/run/postgresql:5432 - accepting connections

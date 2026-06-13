@@ -1,14 +1,15 @@
-version: "3.8"
-
 services:
-  # Service API FastAPI
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    image: fit4110/iot-ingestion:v0.1.0-nhom_8
     container_name: fit4110-api-lab05
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lab05}:${POSTGRES_PASSWORD:-lab05pass}@db:5432/${POSTGRES_DB:-iotdb}
+      AI_SERVICE_URL: http://ai-service:9000
     depends_on:
       db:
         condition: service_healthy
@@ -20,13 +21,18 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  # PostgreSQL database service
   db:
     image: postgres:15-alpine
     container_name: fit4110-db-lab05
@@ -39,23 +45,29 @@ services:
     networks:
       - team-internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab05}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab05} -d ${POSTGRES_DB:-iotdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # AI service mẫu dùng Python HTTP server hoặc FastAPI
   ai-service:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+    image: fit4110/ai-service:v0.1.0-nhom_8
     container_name: fit4110-ai-lab05
-    working_dir: /service
-    volumes:
-      - ./src/ai_service:/service
-    command: ["python", "main.py"]
     networks:
       - team-internal
+    ports:
+      - "${AI_PORT:-9000}:9000"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import requests; import sys; sys.exit(0) if requests.get('http://localhost:9000/health').status_code == 200 else sys.exit(1)\""]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health', timeout=3).read()",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3

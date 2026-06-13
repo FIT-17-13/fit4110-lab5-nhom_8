@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FIT4110 Lab 05 - IoT Ingestion API
-  version: 0.5.0
+  version: v0.1.0-nhom_8
   description: |
     Contract dùng cho Lab 05 Docker Compose readiness, kế thừa logic của Lab 03/04.
     Payload chính dùng các trường device_id, metric, value, unit và timestamp.
@@ -40,7 +40,7 @@ paths:
                   value:
                     status: ok
                     service: iot-ingestion
-                    version: 0.5.0
+                    version: v0.1.0-nhom_8
 
   /readings:
     post:
@@ -327,7 +327,13 @@ components:
           example: iot-ingestion
         version:
           type: string
-          example: 0.5.0
+          example: v0.1.0-nhom_8
+        db:
+          type: string
+          example: ok
+        ai:
+          type: string
+          example: ok
 
     ProblemDetails:
       type: object

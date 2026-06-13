@@ -27,6 +27,9 @@ npm install
 # Copy .env.example sang .env và chỉnh sửa nếu cần
 cp .env.example .env
 
+# Tạo mạng class-net (chỉ cần một lần)
+docker network create class-net
+
 # Build images (nếu chưa có) và khởi động các container trong nền
 docker compose up -d --build
 ```

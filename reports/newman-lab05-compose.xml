@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="FIT4110 Lab05 IoT Compose" tests="8" time="0.136">
+  <testsuite name="Health / GET /health" id="6547644e-9b49-47d5-ac27-614aec213e07" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.034">
+    <testcase name="Status code is 200" time="0.034" classname="HealthGetHealth"/>
+    <testcase name="Health payload is valid" time="0.034" classname="HealthGetHealth"/>
+  </testsuite>
+  <testsuite name="Readings / POST /readings - valid temperature" id="4a035f71-0750-4f5c-9027-6b5d51f824da" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.026">
+    <testcase name="Status code is 201" time="0.026" classname="ReadingsPostReadingsValidTemperature"/>
+    <testcase name="Reading created" time="0.026" classname="ReadingsPostReadingsValidTemperature"/>
+  </testsuite>
+  <testsuite name="Readings / POST /readings - high temperature warning" id="7e8644b3-8d77-4bf2-8896-fdfe5cd34fd6" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.026">
+    <testcase name="Status code is 201" time="0.026" classname="ReadingsPostReadingsHighTemperatureWarning"/>
+    <testcase name="High temperature warning header present" time="0.026" classname="ReadingsPostReadingsHighTemperatureWarning"/>
+  </testsuite>
+  <testsuite name="Readings / POST /readings - missing token" id="ca447ee6-8ca2-4e63-90e5-c82bdc640aac" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.004">
+    <testcase name="Status code is 401" time="0.004" classname="ReadingsPostReadingsMissingToken"/>
+    <testcase name="Problem details returned" time="0.004" classname="ReadingsPostReadingsMissingToken"/>
+  </testsuite>
+  <testsuite name="Readings / POST /readings - validation error" id="d65c99f2-e71d-4152-a18b-43e4ad106ef6" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.004">
+    <testcase name="Status code is 422" time="0.004" classname="ReadingsPostReadingsValidationError"/>
+    <testcase name="Validation problem details returned" time="0.004" classname="ReadingsPostReadingsValidationError"/>
+  </testsuite>
+  <testsuite name="Readings / GET /readings/latest" id="19936b49-f056-4c9c-ae4e-1e52735ccff6" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.015">
+    <testcase name="Status code is 200" time="0.015" classname="ReadingsGetReadingsLatest"/>
+    <testcase name="Latest readings returned" time="0.015" classname="ReadingsGetReadingsLatest"/>
+  </testsuite>
+  <testsuite name="Readings / GET /readings/{reading_id}" id="0a18d1ed-f9cd-455a-ba4d-612a8c5cb0f6" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.014">
+    <testcase name="Status code is 200" time="0.014" classname="ReadingsGetReadingsReadingId"/>
+    <testcase name="Reading detail returned" time="0.014" classname="ReadingsGetReadingsReadingId"/>
+  </testsuite>
+  <testsuite name="Readings / GET /readings/{reading_id} - not found" id="91151a6b-2bf4-4d7d-bf81-fee104974837" timestamp="2026-06-13T07:16:33.347Z" tests="2" failures="0" errors="0" time="0.013">
+    <testcase name="Status code is 404" time="0.013" classname="ReadingsGetReadingsReadingIdNotFound"/>
+    <testcase name="Not found problem details returned" time="0.013" classname="ReadingsGetReadingsReadingIdNotFound"/>
+  </testsuite>
+</testsuites>

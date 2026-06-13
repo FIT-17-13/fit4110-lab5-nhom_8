@@ -10,7 +10,7 @@ lint:
 
 # Build Docker image for API only
 build:
-	docker build -t fit4110/iot-ingestion:lab05 .
+	docker build -t fit4110/iot-ingestion:v0.1.0-nhom_8 .
 
 # Run API container standalone (not via compose)
 run:
@@ -18,6 +18,7 @@ run:
 
 # Compose commands
 compose-up:
+	-docker network create class-net
 	docker compose up -d --build
 
 compose-down:
